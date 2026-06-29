@@ -9,11 +9,30 @@ import StripEditor from "@/app/components/StripEditor";
 let UID = 1;
 const withIds = (decos) => decos.map((d) => ({ ...d, id: UID++ }));
 
+// Instagram / Facebook / TikTok etc. in-app browsers block downloads and the
+// Web Share API. Detect them so we can ask the user to open in a real browser.
+function detectInAppBrowser() {
+  if (typeof navigator === "undefined") return null;
+  const ua = navigator.userAgent || "";
+  if (/Instagram/i.test(ua)) return "Instagram";
+  if (/FBAN|FBAV|FB_IAB/i.test(ua)) return "Facebook";
+  if (/Messenger/i.test(ua)) return "Messenger";
+  if (/TikTok|musical_ly|BytedanceWebview/i.test(ua)) return "TikTok";
+  if (/Snapchat/i.test(ua)) return "Snapchat";
+  if (/Line\//i.test(ua)) return "LINE";
+  return null;
+}
+
 export default function Home() {
   const [screen, setScreen] = useState("select"); // 'select' | 'capture'
   const [template, setTemplate] = useState(null);
   const [photos, setPhotos] = useState([]);
   const [decorations, setDecorations] = useState([]);
+  const [inApp, setInApp] = useState(null);
+
+  useEffect(() => {
+    setInApp(detectInAppBrowser());
+  }, []);
 
   function chooseTemplate(t) {
     setTemplate(t);
@@ -38,6 +57,24 @@ export default function Home() {
         </h1>
         <p className="tagline">Pick a cute strip, strike a pose, decorate & download ✨</p>
       </header>
+
+      {inApp && (
+        <div className="inapp-banner" role="alert">
+          <span>
+            You opened this inside {inApp}. Downloads don’t work here — tap the{" "}
+            <strong>•••</strong> menu and choose{" "}
+            <strong>“Open in browser”</strong> (Safari/Chrome) to save your strip.
+          </span>
+          <button
+            type="button"
+            className="inapp-dismiss"
+            aria-label="Dismiss"
+            onClick={() => setInApp(null)}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {screen === "select" ? (
         <SelectScreen onChoose={chooseTemplate} />
@@ -145,17 +182,42 @@ function CaptureScreen({ template, photos, setPhotos, decorations, setDecoration
   async function download() {
     const c = document.createElement("canvas");
     await renderStrip(c, template, photos, { scale: 4, decorations });
-    c.toBlob(
-      (blob) => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `photostrip-${template.id}.png`;
-        a.click();
-        URL.revokeObjectURL(url);
-      },
-      "image/png"
+
+    const blob = await new Promise((resolve) =>
+      c.toBlob(resolve, "image/png")
     );
+    if (!blob) return;
+
+    const filename = `photostrip-${template.id}.png`;
+
+    // On mobile (esp. iOS Safari) the <a download> trick is unreliable —
+    // the Web Share API lets the user save to Photos / share instead.
+    const file = new File([blob], filename, { type: "image/png" });
+    if (
+      navigator.canShare &&
+      navigator.canShare({ files: [file] })
+    ) {
+      try {
+        await navigator.share({ files: [file] });
+        return;
+      } catch (err) {
+        // user cancelled the share sheet, or it failed — fall through to download
+        if (err?.name === "AbortError") return;
+      }
+    }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    // Keep the blob URL alive long enough for the browser to start the download.
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 4000);
   }
 
   // sticker controls

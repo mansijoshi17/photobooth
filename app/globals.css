@@ -50,6 +50,37 @@ body {
   color: #9a8693;
 }
 
+/* ---------------- in-app browser banner ---------------- */
+.inapp-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 520px;
+  margin: 0 auto 18px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #fff4d6;
+  border: 1px solid #f0d68a;
+  color: #6b5560;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.inapp-banner strong {
+  color: #b46a00;
+}
+
+.inapp-dismiss {
+  flex: 0 0 auto;
+  border: none;
+  background: transparent;
+  color: #9a8693;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
 .section-title {
   text-align: center;
   font-size: 18px;
