@@ -263,20 +263,22 @@ export async function renderStrip(canvas, t, photos = [], opts = {}) {
     ctx.stroke();
   });
 
-  // sticker decorations
-  const decos = t.decorations || [];
-  const stickers = await Promise.all(decos.map((d) => loadSticker(d.src)));
-  decos.forEach((d, i) => {
-    const img = stickers[i];
-    if (!img) return;
-    const w = d.size;
-    const h = d.size * (img.height / img.width || 1);
-    ctx.save();
-    ctx.translate(d.x, d.y);
-    if (d.rot) ctx.rotate(d.rot);
-    ctx.drawImage(img, -w / 2, -h / 2, w, h);
-    ctx.restore();
-  });
+  // sticker decorations (skippable for the live editor; overridable for download)
+  if (!opts.skipDecorations) {
+    const decos = opts.decorations || t.decorations || [];
+    const stickers = await Promise.all(decos.map((d) => loadSticker(d.src)));
+    decos.forEach((d, i) => {
+      const img = stickers[i];
+      if (!img) return;
+      const w = d.size;
+      const h = d.size * (img.height / img.width || 1);
+      ctx.save();
+      ctx.translate(d.x, d.y);
+      if (d.rot) ctx.rotate(d.rot);
+      ctx.drawImage(img, -w / 2, -h / 2, w, h);
+      ctx.restore();
+    });
+  }
 
   // title / date
   if (t.title) {

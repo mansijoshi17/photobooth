@@ -4,15 +4,21 @@ import { useEffect, useRef, useState } from "react";
 import { TEMPLATES } from "@/app/lib/templates";
 import { renderStrip } from "@/app/lib/renderStrip";
 import Photostrip from "@/app/components/Photostrip";
+import StripEditor from "@/app/components/StripEditor";
+
+let UID = 1;
+const withIds = (decos) => decos.map((d) => ({ ...d, id: UID++ }));
 
 export default function Home() {
   const [screen, setScreen] = useState("select"); // 'select' | 'capture'
   const [template, setTemplate] = useState(null);
   const [photos, setPhotos] = useState([]);
+  const [decorations, setDecorations] = useState([]);
 
   function chooseTemplate(t) {
     setTemplate(t);
     setPhotos([]);
+    setDecorations(withIds(t.decorations));
     setScreen("capture");
   }
 
@@ -20,13 +26,17 @@ export default function Home() {
     setScreen("select");
     setTemplate(null);
     setPhotos([]);
+    setDecorations([]);
   }
 
   return (
     <main className="page">
       <header className="header">
-        <h1 className="brand">📸 Photobooth</h1>
-        <p className="tagline">Pick a cute strip, strike a pose, take it home ✨</p>
+        <h1 className="brand">
+          <img src="/photobooth-logo.png" alt="" className="brand-logo" />
+          <span className="brand-text">Photobooth</span>
+        </h1>
+        <p className="tagline">Pick a cute strip, strike a pose, decorate & download ✨</p>
       </header>
 
       {screen === "select" ? (
@@ -36,6 +46,8 @@ export default function Home() {
           template={template}
           photos={photos}
           setPhotos={setPhotos}
+          decorations={decorations}
+          setDecorations={setDecorations}
           onBack={goBack}
         />
       )}
@@ -61,11 +73,8 @@ function SelectScreen({ onChoose }) {
               />
             </div>
             <span className="template-name">{t.name}</span>
-            <span className="template-meta">
-              {t.slots.length} photos · 2&quot;×6&quot;
-            </span>
             <span className="use-btn" style={{ background: t.accent }}>
-              Use this 💕
+              {t.cta || "Use this 💕"}
             </span>
           </button>
         ))}
@@ -76,16 +85,16 @@ function SelectScreen({ onChoose }) {
 
 /* ------------------------------- Capture --------------------------------- */
 
-function CaptureScreen({ template, photos, setPhotos, onBack }) {
+function CaptureScreen({ template, photos, setPhotos, decorations, setDecorations, onBack }) {
   const videoRef = useRef(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
-  const [count, setCount] = useState(0); // countdown number (0 = idle)
+  const [count, setCount] = useState(0);
+  const [selectedId, setSelectedId] = useState(null);
 
   const total = template.slots.length;
   const done = photos.length >= total;
 
-  // start / stop camera
   useEffect(() => {
     let stream;
     async function start() {
@@ -113,7 +122,6 @@ function CaptureScreen({ template, photos, setPhotos, onBack }) {
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext("2d");
-    // mirror to match the preview
     ctx.translate(canvas.width, 0);
     ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -130,15 +138,13 @@ function CaptureScreen({ template, photos, setPhotos, onBack }) {
         clearInterval(timer);
         setCount(0);
         snap();
-      } else {
-        setCount(n);
-      }
+      } else setCount(n);
     }, 1000);
   }
 
   async function download() {
     const c = document.createElement("canvas");
-    await renderStrip(c, template, photos, { scale: 4 });
+    await renderStrip(c, template, photos, { scale: 4, decorations });
     c.toBlob(
       (blob) => {
         const url = URL.createObjectURL(blob);
@@ -151,6 +157,19 @@ function CaptureScreen({ template, photos, setPhotos, onBack }) {
       "image/png"
     );
   }
+
+  // sticker controls
+  const updateSelected = (fn) =>
+    setDecorations((prev) => prev.map((d) => (d.id === selectedId ? fn(d) : d)));
+  const addSticker = (src) => {
+    const id = UID++;
+    setDecorations((prev) => [...prev, { src, x: 150, y: 300, size: 50, rot: 0, id }]);
+    setSelectedId(id);
+  };
+  const removeSelected = () => {
+    setDecorations((prev) => prev.filter((d) => d.id !== selectedId));
+    setSelectedId(null);
+  };
 
   return (
     <section className="capture">
@@ -192,29 +211,46 @@ function CaptureScreen({ template, photos, setPhotos, onBack }) {
             </button>
           ) : (
             <div className="done-actions">
-              <button
-                className="snap-btn"
-                style={{ background: template.accent }}
-                onClick={download}
-              >
+              <button className="snap-btn" style={{ background: template.accent }} onClick={download}>
                 ⬇ Download strip
               </button>
               <button className="ghost-btn wide" onClick={() => setPhotos([])}>
-                ↺ Retake
+                ↺ Retake photos
               </button>
             </div>
           )}
-          {done && <p className="done-note">All set! 🎉 Save your strip below the camera.</p>}
+          <p className="hint">✨ Drag stickers on the strip to place them. Tap one to resize, rotate or remove.</p>
         </div>
 
-        {/* Live strip preview */}
+        {/* Editable strip */}
         <div className="strip-col">
-          <Photostrip
+          {/* toolbar for the selected sticker */}
+          <div className={"sticker-toolbar" + (selectedId ? " active" : "")}>
+            <button onClick={() => updateSelected((d) => ({ ...d, size: Math.max(14, d.size / 1.15) }))} title="Smaller">－</button>
+            <button onClick={() => updateSelected((d) => ({ ...d, size: Math.min(170, d.size * 1.15) }))} title="Bigger">＋</button>
+            <button onClick={() => updateSelected((d) => ({ ...d, rot: (d.rot || 0) - Math.PI / 12 }))} title="Rotate left">↺</button>
+            <button onClick={() => updateSelected((d) => ({ ...d, rot: (d.rot || 0) + Math.PI / 12 }))} title="Rotate right">↻</button>
+            <button className="del" onClick={removeSelected} title="Remove">🗑</button>
+          </div>
+
+          <StripEditor
             template={template}
             photos={photos}
-            scale={3}
-            style={{ width: 200, height: "auto", display: "block" }}
+            decorations={decorations}
+            setDecorations={setDecorations}
+            selectedId={selectedId}
+            setSelectedId={setSelectedId}
+            width={236}
           />
+
+          {/* sticker tray */}
+          <div className="sticker-tray">
+            {(template.palette || []).map((src, i) => (
+              <button key={i} className="tray-item" onClick={() => addSticker(src)} title="Add sticker">
+                <img src={src} alt="" draggable={false} />
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </section>
