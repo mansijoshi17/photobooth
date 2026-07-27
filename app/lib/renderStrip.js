@@ -130,6 +130,18 @@ function drawStripes(ctx, base, stripe, band) {
   ctx.restore();
 }
 
+function drawVerticalStripes(ctx, base, stripe, band) {
+  ctx.save();
+  clipStrip(ctx);
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, STRIP_W, STRIP_H);
+  ctx.fillStyle = stripe;
+  for (let x = 0; x < STRIP_W; x += band * 2) {
+    ctx.fillRect(x, 0, band, STRIP_H);
+  }
+  ctx.restore();
+}
+
 function drawPolka(ctx, base, dot, cell) {
   ctx.save();
   clipStrip(ctx);
@@ -226,6 +238,7 @@ export async function renderStrip(canvas, t, photos = [], opts = {}) {
   if (b.type === "gingham") drawGingham(ctx, b.color, b.base, b.cell);
   else if (b.type === "grid") drawGrid(ctx, b.color, b.base, b.cell);
   else if (b.type === "stripes") drawStripes(ctx, b.base, b.color, b.cell);
+  else if (b.type === "vstripes") drawVerticalStripes(ctx, b.base, b.color, b.cell);
   else drawPolka(ctx, b.base, b.dot, b.cell);
 
   // optional frame panel behind the photos

@@ -95,11 +95,38 @@ export default function Home() {
 /* ------------------------------- Select ---------------------------------- */
 
 function SelectScreen({ onChoose }) {
+  const [selectedStyle, setSelectedStyle] = useState("all");
+  const kawaiiIds = new Set(["shinchan", "pink-kawaii", "blue-kawaii", "butter-kawaii"]);
+  const visibleTemplates =
+    selectedStyle === "all"
+      ? TEMPLATES
+      : TEMPLATES.filter((template) =>
+          selectedStyle === "kawaii"
+            ? kawaiiIds.has(template.id)
+            : !kawaiiIds.has(template.id)
+        );
+
   return (
     <section>
       <h2 className="section-title">Choose your template</h2>
+      <div className="style-filter">
+        <label htmlFor="strip-style">Strip style</label>
+        <div className="style-select-wrap">
+          <select
+            id="strip-style"
+            className="style-select"
+            value={selectedStyle}
+            onChange={(event) => setSelectedStyle(event.target.value)}
+          >
+            <option value="all">All strips (7)</option>
+            <option value="kawaii">Kawaii strips (4)</option>
+            <option value="classic">Classic strips (3)</option>
+          </select>
+          <span className="style-select-arrow" aria-hidden="true">⌄</span>
+        </div>
+      </div>
       <div className="template-grid">
-        {TEMPLATES.map((t) => (
+        {visibleTemplates.map((t) => (
           <button key={t.id} className="template-card" onClick={() => onChoose(t)}>
             <div className="thumb-wrap">
               <Photostrip
@@ -307,8 +334,8 @@ function CaptureScreen({ template, photos, setPhotos, decorations, setDecoration
 
           {/* sticker tray */}
           <div className="sticker-tray">
-            {(template.palette || []).map((src, i) => (
-              <button key={i} className="tray-item" onClick={() => addSticker(src)} title="Add sticker">
+            {[...new Set(template.palette || [])].map((src) => (
+              <button key={src} className="tray-item" onClick={() => addSticker(src)} title="Add sticker">
                 <img src={src} alt="" draggable={false} />
               </button>
             ))}
